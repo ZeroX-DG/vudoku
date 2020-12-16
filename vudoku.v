@@ -112,12 +112,14 @@ fn (mut g Game) draw_grid() {
 				cell_border_color
 			)
 
-			g.gg.draw_text(
-				x * cell_size + cell_size / 2,
-				y * cell_size + cell_size / 2,
-				cell.value.str(),
-				valid_cell_text_cfg
-			)
+			if cell.value > 0 {
+				g.gg.draw_text(
+					x * cell_size + cell_size / 2,
+					y * cell_size + cell_size / 2,
+					cell.value.str(),
+					valid_cell_text_cfg
+				)
+			}
 		}
 	}
 
@@ -178,6 +180,10 @@ fn (mut g Game) set_cell_value(cell Location, value i8) {
 	g.grid[cell.row][cell.col].value = value
 }
 
+fn (mut g Game) clear_cell(cell Location) {
+	g.set_cell_value(cell, 0)
+}
+
 fn (mut g Game) mouse_left_down(x f32, y f32) {
 	col := i8(x / cell_size)
 	row := i8(y / cell_size)
@@ -212,6 +218,9 @@ fn (mut g Game) key_down(key sapp.KeyCode) {
 		}
 		._9 {
 			g.set_cell_value(g.active_cell, 9)
+		}
+		.c {
+			g.clear_cell(g.active_cell)
 		}
 		else {
 		}
