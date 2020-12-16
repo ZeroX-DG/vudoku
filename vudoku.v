@@ -23,22 +23,32 @@ const (
 	cell_border_color             = gx.rgb(200, 200, 200)
 	cell_highlight_color          = gx.rgb(217, 217, 217)
 	cell_line_row_highlight_color = gx.rgb(240, 240, 240)
+	cell_user_input_color         = gx.rgb(27 , 84 , 196)
 )
 
 // text configs
 const (
-	valid_cell_text_cfg = gx.TextCfg {
+	cell_text_cfg = gx.TextCfg {
 		align: .center
 		vertical_align: .middle
 		size: cell_text_size
+		mono: false
+	}
+
+	cell_user_input_text_cfg = gx.TextCfg {
+		align: .center
+		vertical_align: .middle
+		size: cell_text_size
+		color: cell_user_input_color
 		mono: false
 	}
 )
 
 struct Cell {
 mut:
-  value   i8
-	invalid bool
+  value     i8
+	invalid   bool
+	generated bool
 }
 
 struct Location {
@@ -87,7 +97,7 @@ fn main() {
 }
 
 fn (mut g Game) init_game() {
-	board := generator.generate_board()
+	board := generator.generate_board(.easy)
 
 	mut grid := [][]Cell{ cap: 9, init: []Cell{ cap: 9 } }
 	for y in 0 .. 9 {
@@ -96,6 +106,8 @@ fn (mut g Game) init_game() {
 			cell := Cell {
 				value: board[y][x]
 				invalid: false
+				// if there's a value, then that cell is generated
+				generated: board[y][x] != 0
 			}
 			row_arr << cell
 		}
@@ -120,7 +132,7 @@ fn (mut g Game) draw_grid() {
 					x * cell_size + cell_size / 2,
 					y * cell_size + cell_size / 2,
 					cell.value.str(),
-					valid_cell_text_cfg
+					if cell.generated { cell_text_cfg } else { cell_user_input_text_cfg }
 				)
 			}
 		}
@@ -198,6 +210,10 @@ fn (mut g Game) set_active_cell(col i8, row i8) {
 }
 
 fn (mut g Game) set_cell_value(cell Location, value i8) {
+	// prevent modifying a generated cell
+	if g.grid[cell.row][cell.col].generated {
+		return
+	}
 	g.grid[cell.row][cell.col].value = value
 }
 

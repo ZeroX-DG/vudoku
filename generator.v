@@ -2,7 +2,14 @@ module generator
 
 import rand
 
-pub fn generate_board() [][]i8 {
+pub enum Difficulty {
+	easy
+	medium
+	hard
+	expert
+}
+
+pub fn generate_board(difficulty Difficulty) [][]i8 {
 	mut grid := [][]i8{len: 9, init: []i8{ len: 9, init: 0 }}
 	mut density := 9
 
@@ -13,7 +20,33 @@ pub fn generate_board() [][]i8 {
 		randomize(mut grid, density)
 	}
 
+	// filter out random pos only keep a certain number of cells
+	number_of_cells_to_keep := match difficulty {
+		.easy { 50 }
+		.medium { 40 }
+		.hard { 30 }
+		.expert { 20 }
+	}
+	filter_random_pos(mut grid, number_of_cells_to_keep)
+
 	return grid
+}
+
+fn filter_random_pos(mut grid [][]i8, number_of_cells_to_keep int) {
+	mut count := 0
+
+	for 81 - count > number_of_cells_to_keep {
+		row := rand.int_in_range(0, 9)
+		col := rand.int_in_range(0, 9)
+
+		if grid[row][col] == 0 {
+			continue
+		}
+
+		grid[row][col] = 0
+
+		count++
+	}
 }
 
 fn randomize(mut grid [][]i8, density int) {
