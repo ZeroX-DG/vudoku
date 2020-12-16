@@ -4,6 +4,7 @@ import os
 import gg
 import gx
 import sokol.sapp
+import generator
 
 // sizes
 const (
@@ -86,12 +87,14 @@ fn main() {
 }
 
 fn (mut g Game) init_game() {
+	board := generator.generate_board()
+
 	mut grid := [][]Cell{ cap: 9, init: []Cell{ cap: 9 } }
-	for _ in 0 .. 9 {
+	for y in 0 .. 9 {
 		mut row_arr := []Cell{ cap: 9 }
-		for _ in 0 .. 9 {
+		for x in 0 .. 9 {
 			cell := Cell {
-				value: 0
+				value: board[y][x]
 				invalid: false
 			}
 			row_arr << cell
@@ -136,22 +139,6 @@ fn (mut g Game) draw_grid() {
 	}
 }
 
-fn get_region(cell Location) ([]i8, []i8) {
-	col_range := get_range(cell.col)
-	row_range := get_range(cell.row)
-
-	return row_range, col_range
-}
-
-fn get_range(value i8) []i8 {
-	return match value {
-		0 ... 2 { [ i8(0), i8(3) ] }
-		3 ... 5 { [ i8(3), i8(6) ] }
-		6 ... 8 { [ i8(6), i8(9) ] }
-		else { [i8(0), i8(0)] }
-	}
-}
-
 fn (mut g Game) draw_active_cell() {
 	for count in 0 .. 9 {
 		// highlight the whole col
@@ -173,16 +160,11 @@ fn (mut g Game) draw_active_cell() {
 	}
 
 	// highlight region
-	row_range, col_range := get_region(g.active_cell)
+	region_x := g.active_cell.col / 3
+	region_y := g.active_cell.row / 3
 
-	row_start := row_range[0]
-	row_end := row_range[1]
-
-	col_start := col_range[0]
-	col_end := col_range[1]
-
-	for y in row_start .. row_end {
-		for x in col_start .. col_end {
+	for y in region_y * 3 .. region_y * 3 + 3 {
+		for x in region_x * 3 .. region_x * 3 + 3 {
 			g.gg.draw_rect(
 				x * cell_size,
 				y * cell_size,
