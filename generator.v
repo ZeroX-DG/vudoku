@@ -86,7 +86,7 @@ fn solve(mut grid [][]i8) bool {
 	return false
 }
 
-fn is_valid(grid [][]i8, value i8, row int, col int) bool {
+pub fn is_valid(grid [][]i8, value i8, row int, col int) bool {
 	// check column
 	for row_index, row_content in grid {
 		// if there's a row has a value that we need to check

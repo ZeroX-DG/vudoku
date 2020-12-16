@@ -24,6 +24,9 @@ const (
 	cell_highlight_color          = gx.rgb(217, 217, 217)
 	cell_line_row_highlight_color = gx.rgb(240, 240, 240)
 	cell_user_input_color         = gx.rgb(27 , 84 , 196)
+	cell_invalid_active_bg_color  = gx.rgb(255, 191, 191)
+	cell_invalid_bg_color         = gx.rgb(255, 219, 219)
+	cell_invalid_fg_color         = gx.rgb(255, 33, 33)
 )
 
 // text configs
@@ -42,12 +45,19 @@ const (
 		color: cell_user_input_color
 		mono: false
 	}
+
+	cell_invalid_text_cfg = gx.TextCfg {
+		align: .center
+		vertical_align: .middle
+		size: cell_text_size
+		color: cell_invalid_fg_color
+		mono: false
+	}
 )
 
 struct Cell {
 mut:
   value     i8
-	invalid   bool
 	generated bool
 }
 
@@ -59,9 +69,10 @@ pub:
 
 struct Game {
 mut:
-	grid        [][]Cell
-	gg          &gg.Context = voidptr(0)
-	active_cell Location
+	grid          [][]Cell
+	gg            &gg.Context = voidptr(0)
+	active_cell   Location
+	invalid_cells []Location
 }
 
 fn frame(mut game Game) {
@@ -77,6 +88,7 @@ fn main() {
 			row: 5
 			col: 2
 		}
+		invalid_cells: []Location{}
 	}
 
 	game.gg = gg.new_context({
@@ -105,7 +117,6 @@ fn (mut g Game) init_game() {
 		for x in 0 .. 9 {
 			cell := Cell {
 				value: board[y][x]
-				invalid: false
 				// if there's a value, then that cell is generated
 				generated: board[y][x] != 0
 			}
@@ -127,17 +138,25 @@ fn (mut g Game) draw_grid() {
 				cell_border_color
 			)
 
+			text_cfg := if cell.generated {
+				cell_text_cfg
+			} else {
+				cell_user_input_text_cfg
+			}
+
 			if cell.value > 0 {
 				g.gg.draw_text(
 					x * cell_size + cell_size / 2,
 					y * cell_size + cell_size / 2,
 					cell.value.str(),
-					if cell.generated { cell_text_cfg } else { cell_user_input_text_cfg }
+					text_cfg
 				)
 			}
 		}
 	}
+}
 
+fn (mut g Game) draw_regions() {
 	for y in 0 .. 3 {
 		for x in 0 .. 3 {
 			g.gg.draw_empty_rect(
@@ -147,6 +166,60 @@ fn (mut g Game) draw_grid() {
 				cell_size * 3,
 				gx.black
 			)
+		}
+	}
+}
+
+fn (mut g Game) draw_invalid_cell() {
+	for cell in g.invalid_cells {
+		cell_value := g.grid[cell.row][cell.col].value
+
+		if cell_value == 0 {
+			continue
+		}
+
+		g.gg.draw_empty_rect(
+			cell.col * cell_size,
+			cell.row * cell_size,
+			cell_size,
+			cell_size,
+			cell_border_color
+		)
+		g.gg.draw_text(
+			cell.col * cell_size + cell_size / 2,
+			cell.row * cell_size + cell_size / 2,
+			cell_value.str(),
+			cell_invalid_text_cfg
+		)
+	}
+
+	for invalid_cell in g.invalid_cells {
+		if g.active_cell.row == invalid_cell.row && g.active_cell.col == invalid_cell.col {
+			for cell in g.get_invalids_for_cell(g.active_cell) {
+				cell_value := g.grid[cell.row][cell.col].value
+
+				g.gg.draw_rect(
+					cell.col * cell_size,
+					cell.row * cell_size,
+					cell_size,
+					cell_size,
+					cell_invalid_bg_color
+				)
+				g.gg.draw_empty_rect(
+					cell.col * cell_size,
+					cell.row * cell_size,
+					cell_size,
+					cell_size,
+					cell_border_color
+				)
+				g.gg.draw_text(
+					cell.col * cell_size + cell_size / 2,
+					cell.row * cell_size + cell_size / 2,
+					cell_value.str(),
+					cell_invalid_text_cfg
+				)
+			}
+			break
 		}
 	}
 }
@@ -200,6 +273,8 @@ fn (mut g Game) draw_active_cell() {
 fn (mut g Game) draw_scene() {
 	g.draw_active_cell()
 	g.draw_grid()
+	g.draw_invalid_cell()
+	g.draw_regions()
 }
 
 fn (mut g Game) set_active_cell(col i8, row i8) {
@@ -215,6 +290,9 @@ fn (mut g Game) set_cell_value(cell Location, value i8) {
 		return
 	}
 	g.grid[cell.row][cell.col].value = value
+
+	// validate the board
+	g.validate()
 }
 
 fn (mut g Game) clear_cell(cell Location) {
@@ -271,5 +349,121 @@ fn on_event(e &sapp.Event, mut game Game) {
 
 	if e.typ == .key_down {
 		game.key_down(e.key_code)
+	}
+}
+
+fn (g Game) get_invalids_for_cell(cell Location) []Location {
+	mut invalids := []Location{}
+
+	cell_value := g.grid[cell.row][cell.col].value
+
+	if cell_value == 0 {
+		return []
+	}
+
+	// check column
+	for row, row_content in g.grid {
+		// if there's a row has a value that we need to check
+		// at the specified column and the row is not the one
+		// we about to insert then there's a dupplicate.
+		if row_content[cell.col].value == cell_value && row != cell.row {
+			invalids << Location {
+				row: i8(row),
+				col: i8(cell.col)
+			}
+		}
+	}
+
+	// check row
+	for col, current_cell in g.grid[cell.row] {
+		if current_cell.value == cell_value && col != cell.col {
+			invalids << Location {
+				row: i8(cell.row),
+				col: i8(col)
+			}
+		}
+	}
+
+	// check region
+	region_x := cell.col / 3
+	region_y := cell.row / 3
+
+	for y in region_y * 3 .. region_y * 3 + 3 {
+		for x in region_x * 3 .. region_x * 3 + 3 {
+			if g.grid[y][x].value == cell_value {
+				invalids << Location {
+					row: i8(y),
+					col: i8(x)
+				}
+			}
+		}
+	}
+
+	return invalids
+}
+
+fn (mut g Game) validate() {
+	g.invalid_cells = []
+
+	for row_index, row in g.grid {
+		for col_index, cell in row {
+			if cell.value == 0 || cell.generated {
+				continue
+			}
+
+			mut skip := false
+
+			// check column
+			for i, row_content in g.grid {
+				if row_content[col_index].value == cell.value && i != row_index {
+					g.invalid_cells << Location {
+						row: i8(row_index),
+						col: i8(col_index)
+					}
+					skip = true
+					break
+				}
+			}
+
+			if skip {
+				continue
+			}
+
+			// check row
+			for i, current_cell in row {
+				if current_cell.value == cell.value && i != col_index {
+					g.invalid_cells << Location {
+						row: i8(row_index),
+						col: i8(col_index)
+					}
+					skip = true
+					break
+				}
+			}
+
+			if skip {
+				continue
+			}
+
+			// check region
+			region_x := col_index / 3
+			region_y := row_index / 3
+
+			for y in region_y * 3 .. region_y * 3 + 3 {
+				for x in region_x * 3 .. region_x * 3 + 3 {
+					if g.grid[y][x].value == cell.value && y != row_index && x != col_index {
+						g.invalid_cells << Location {
+							row: i8(row_index),
+							col: i8(col_index)
+						}
+						skip = true
+						break
+					}
+				}
+				if skip {
+					break
+				}
+			}
+		}
 	}
 }
