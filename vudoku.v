@@ -8,7 +8,7 @@ import sokol.sapp
 // sizes
 const (
 	cell_size         = 50
-	cell_text_size    = 25
+	cell_text_size    = 30
 	game_size         = cell_size * 9
 )
 
@@ -136,6 +136,22 @@ fn (mut g Game) draw_grid() {
 	}
 }
 
+fn get_region(cell Location) ([]i8, []i8) {
+	col_range := get_range(cell.col)
+	row_range := get_range(cell.row)
+
+	return row_range, col_range
+}
+
+fn get_range(value i8) []i8 {
+	return match value {
+		0 ... 2 { [ i8(0), i8(3) ] }
+		3 ... 5 { [ i8(3), i8(6) ] }
+		6 ... 8 { [ i8(6), i8(9) ] }
+		else { [i8(0), i8(0)] }
+	}
+}
+
 fn (mut g Game) draw_active_cell() {
 	for count in 0 .. 9 {
 		// highlight the whole col
@@ -155,6 +171,29 @@ fn (mut g Game) draw_active_cell() {
 			cell_line_row_highlight_color
 		)
 	}
+
+	// highlight region
+	row_range, col_range := get_region(g.active_cell)
+
+	row_start := row_range[0]
+	row_end := row_range[1]
+
+	col_start := col_range[0]
+	col_end := col_range[1]
+
+	for y in row_start .. row_end {
+		for x in col_start .. col_end {
+			g.gg.draw_rect(
+				x * cell_size,
+				y * cell_size,
+				cell_size,
+				cell_size,
+				cell_line_row_highlight_color
+			)
+		}
+	}
+
+	// highlight the main cell
 	g.gg.draw_rect(
 		g.active_cell.col * cell_size,
 		g.active_cell.row * cell_size,
