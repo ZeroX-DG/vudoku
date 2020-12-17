@@ -363,9 +363,6 @@ fn (g Game) get_invalids_for_cell(cell Location) []Location {
 
 	// check column
 	for row, row_content in g.grid {
-		// if there's a row has a value that we need to check
-		// at the specified column and the row is not the one
-		// we about to insert then there's a dupplicate.
 		if row_content[cell.col].value == cell_value && row != cell.row {
 			invalids << Location {
 				row: i8(row),
@@ -399,7 +396,38 @@ fn (g Game) get_invalids_for_cell(cell Location) []Location {
 		}
 	}
 
+
 	return invalids
+}
+
+fn (g Game) is_valid(value i8, cell Location) bool {
+	// check column
+	for i, row_content in g.grid {
+		if row_content[cell.col].value == value && i != cell.row {
+			return false
+		}
+	}
+
+	// check row
+	for i, current_cell in g.grid[cell.row] {
+		if current_cell.value == value && i != cell.col {
+			return false
+		}
+	}
+
+	// check region
+	region_x := cell.col / 3
+	region_y := cell.row / 3
+
+	for y in region_y * 3 .. region_y * 3 + 3 {
+		for x in region_x * 3 .. region_x * 3 + 3 {
+			if g.grid[y][x].value == value && y != cell.row && x != cell.col {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 fn (mut g Game) validate() {
@@ -411,58 +439,15 @@ fn (mut g Game) validate() {
 				continue
 			}
 
-			mut skip := false
-
-			// check column
-			for i, row_content in g.grid {
-				if row_content[col_index].value == cell.value && i != row_index {
-					g.invalid_cells << Location {
-						row: i8(row_index),
-						col: i8(col_index)
-					}
-					skip = true
-					break
-				}
+			cell_location := Location {
+				row: i8(row_index),
+				col: i8(col_index)
 			}
 
-			if skip {
-				continue
-			}
+			cell_valid := g.is_valid(cell.value, cell_location)
 
-			// check row
-			for i, current_cell in row {
-				if current_cell.value == cell.value && i != col_index {
-					g.invalid_cells << Location {
-						row: i8(row_index),
-						col: i8(col_index)
-					}
-					skip = true
-					break
-				}
-			}
-
-			if skip {
-				continue
-			}
-
-			// check region
-			region_x := col_index / 3
-			region_y := row_index / 3
-
-			for y in region_y * 3 .. region_y * 3 + 3 {
-				for x in region_x * 3 .. region_x * 3 + 3 {
-					if g.grid[y][x].value == cell.value && y != row_index && x != col_index {
-						g.invalid_cells << Location {
-							row: i8(row_index),
-							col: i8(col_index)
-						}
-						skip = true
-						break
-					}
-				}
-				if skip {
-					break
-				}
+			if !cell_valid {
+				g.invalid_cells << cell_location
 			}
 		}
 	}
