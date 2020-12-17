@@ -46,6 +46,10 @@ So let's say you just started out and want to try the `expert` level. You would 
 
 If you wins the game or you just want to restart to a new game, press `r`.
 
+### Enter number
+
+To fill a cell with your number, press the number key that you want. You can't use `0` because...there's no `0` in sudoku.
+
 ### Navigation
 
 You can use the arrow keys to navigate in the game or if you are a vim user `hjkl` ftw!
@@ -65,6 +69,7 @@ If you wife come at you and say "we need to talk" or there's an earthquake at yo
 | Key                                     | Function               |
 | --------------------------------------- | ---------------------- |
 | Arrow keys / h j k l / Mouse left click | Navigate between cells |
+| Number keys                             | Fill number into cell  |
 | p                                       | Pause / Resume game    |
 | r                                       | Restart / New game     |
 | c                                       | Clear the current cell |
