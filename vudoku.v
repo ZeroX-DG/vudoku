@@ -31,6 +31,7 @@ const (
 	cell_invalid_bg_color         = gx.rgb(255, 219, 219)
 	cell_invalid_fg_color         = gx.rgb(255, 33, 33)
 	timer_text_color              = gx.rgb(158, 158, 158)
+	win_box_color                 = gx.rgb(95, 39, 205)
 )
 
 // text configs
@@ -81,6 +82,24 @@ const (
 		color: timer_text_color
 		mono: false
 	}
+
+	big_middle_text_cfg = gx.TextCfg {
+		align: .center
+		vertical_align: .middle
+		size: 60
+		color: gx.white
+		mono: false
+		bold: true
+	}
+
+	small_middle_text_cfg = gx.TextCfg {
+		align: .center
+		vertical_align: .middle
+		size: 25
+		color: gx.white
+		mono: false
+		bold: false
+	}
 )
 
 struct Cell {
@@ -108,7 +127,7 @@ mut:
 	active_cell   Location
 	invalid_cells []Location
 	game_timer    time.StopWatch = time.new_stopwatch({})
-	state         GameState = .running
+	state         GameState
 	level         generator.Difficulty = .easy
 }
 
@@ -121,10 +140,6 @@ fn frame(mut game Game) {
 fn main() {
 	mut game := &Game {
 		gg: 0
-		active_cell: Location {
-			row: 5
-			col: 2
-		}
 		invalid_cells: []Location{}
 	}
 
@@ -148,7 +163,12 @@ fn main() {
 fn (mut g Game) init_game() {
 	board := generator.generate_board(g.level)
 
-	g.game_timer.start()
+	g.game_timer.restart()
+	g.state = .running
+	g.active_cell = Location {
+		row: 4
+		col: 4
+	}
 
 	mut grid := [][]Cell{ cap: 9, init: []Cell{ cap: 9 } }
 	for y in 0 .. 9 {
@@ -367,6 +387,30 @@ fn (mut g Game) draw_active_cell() {
 	)
 }
 
+fn (mut g Game) draw_win() {
+	g.gg.draw_rect(
+		0,
+		cell_size * 3,
+		game_size,
+		cell_size * 3,
+		win_box_color
+	)
+	
+	g.gg.draw_text(
+		game_size / 2,
+		game_size / 2 - 30,
+		'You won!',
+		big_middle_text_cfg
+	)
+
+	g.gg.draw_text(
+		game_size / 2,
+		game_size / 2 + 30,
+		'Press R to play a new game',
+		small_middle_text_cfg
+	)
+}
+
 fn (mut g Game) draw_scene() {
 	if g.state != .pause {
 		g.draw_active_cell()
@@ -380,6 +424,10 @@ fn (mut g Game) draw_scene() {
 	g.draw_time()
 	g.draw_level()
 	g.draw_state()
+
+	if g.state == .won {
+		g.draw_win()
+	}
 }
 
 fn (mut g Game) set_active_cell(col i8, row i8) {
@@ -484,6 +532,9 @@ fn (mut g Game) key_down(key sapp.KeyCode) {
 		.c {
 			g.clear_cell(g.active_cell)
 		}
+		.r {
+			g.init_game()
+		}
 		.p {
 			g.toggle_state()
 		}
@@ -579,12 +630,24 @@ fn (g Game) is_valid(value i8, cell Location) bool {
 	return true
 }
 
+fn (mut g Game) wins_game() {
+	g.state = .won
+	g.game_timer.stop()
+}
+
 fn (mut g Game) validate() {
 	g.invalid_cells = []
 
+	mut has_empty_cell := false
+
 	for row_index, row in g.grid {
 		for col_index, cell in row {
-			if cell.value == 0 || cell.generated {
+			if cell.value == 0 {
+				has_empty_cell = true
+				continue
+			}
+
+			if cell.generated {
 				continue
 			}
 
@@ -599,5 +662,11 @@ fn (mut g Game) validate() {
 				g.invalid_cells << cell_location
 			}
 		}
+	}
+
+	// if nothing is invalids and no where to fill in
+	// then the player won the game!
+	if g.invalid_cells.len == 0 && !has_empty_cell {
+		g.wins_game()
 	}
 }
