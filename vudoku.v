@@ -156,8 +156,33 @@ fn main() {
 		font_path: font_path
 	})
 
+	game_level := parse_level(os.args[1]) or {
+		generator.Difficulty.easy
+	}
+
+	game.level = game_level
+
 	game.init_game()
 	game.gg.run()
+}
+
+fn parse_level(raw string) ?generator.Difficulty {
+	if raw == 'easy' {
+		return .easy
+	}
+
+	if raw == 'medium' {
+		return .medium
+	}
+
+	if raw == 'hard' {
+		return .hard
+	}
+
+	if raw == 'expert' {
+		return .expert
+	}
+	return none
 }
 
 fn (mut g Game) init_game() {
