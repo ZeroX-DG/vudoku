@@ -278,9 +278,25 @@ fn (mut g Game) draw_scene() {
 }
 
 fn (mut g Game) set_active_cell(col i8, row i8) {
+	used_col := if col < 0 {
+		0
+	} else if col > 8 {
+		8
+	} else {
+		col
+	}
+
+	used_row := if row < 0 {
+		0
+	} else if row > 8 {
+		8
+	} else {
+		row
+	}
+
 	g.active_cell = Location {
-		col: col,
-		row: row
+		col: used_col,
+		row: used_row
 	}
 }
 
@@ -333,6 +349,22 @@ fn (mut g Game) key_down(key sapp.KeyCode) {
 		}
 		._9 {
 			g.set_cell_value(g.active_cell, 9)
+		}
+		.q {
+			println("Bye bye!")
+			exit(0)
+		}
+		.left, .h {
+			g.set_active_cell(g.active_cell.col - 1, g.active_cell.row)
+		}
+		.right, .l {
+			g.set_active_cell(g.active_cell.col + 1, g.active_cell.row)
+		}
+		.up, .k {
+			g.set_active_cell(g.active_cell.col, g.active_cell.row - 1)
+		}
+		.down, .j {
+			g.set_active_cell(g.active_cell.col, g.active_cell.row + 1)
 		}
 		.c {
 			g.clear_cell(g.active_cell)
