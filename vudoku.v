@@ -5,12 +5,15 @@ import gg
 import gx
 import sokol.sapp
 import generator
+import time
 
 // sizes
 const (
 	cell_size         = 50
 	cell_text_size    = 30
 	game_size         = cell_size * 9
+	status_size       = 50
+	timer_text_size   = 25
 )
 
 // paths
@@ -27,6 +30,7 @@ const (
 	cell_invalid_active_bg_color  = gx.rgb(255, 191, 191)
 	cell_invalid_bg_color         = gx.rgb(255, 219, 219)
 	cell_invalid_fg_color         = gx.rgb(255, 33, 33)
+	timer_text_color              = gx.rgb(158, 158, 158)
 )
 
 // text configs
@@ -53,6 +57,30 @@ const (
 		color: cell_invalid_fg_color
 		mono: false
 	}
+
+	timer_text_cfg = gx.TextCfg {
+		align: .center
+		vertical_align: .middle
+		size: timer_text_size
+		color: timer_text_color
+		mono: true
+	}
+
+	right_align_text_cfg = gx.TextCfg {
+		align: .right
+		vertical_align: .middle
+		size: timer_text_size - 2
+		color: timer_text_color
+		mono: false
+	}
+
+	left_align_text_cfg = gx.TextCfg {
+		align: .left
+		vertical_align: .middle
+		size: timer_text_size - 2
+		color: timer_text_color
+		mono: false
+	}
 )
 
 struct Cell {
@@ -67,12 +95,21 @@ pub:
 	col i8
 }
 
+enum GameState {
+	running
+	pause
+	won
+}
+
 struct Game {
 mut:
 	grid          [][]Cell
 	gg            &gg.Context = voidptr(0)
 	active_cell   Location
 	invalid_cells []Location
+	game_timer    time.StopWatch = time.new_stopwatch({})
+	state         GameState = .running
+	level         generator.Difficulty = .easy
 }
 
 fn frame(mut game Game) {
@@ -94,7 +131,7 @@ fn main() {
 	game.gg = gg.new_context({
 		bg_color: gx.white
 		width: game_size
-		height: game_size
+		height: game_size + status_size
 		use_ortho: true
 		create_window: true
 		window_title: 'Vudoku'
@@ -109,7 +146,9 @@ fn main() {
 }
 
 fn (mut g Game) init_game() {
-	board := generator.generate_board(.easy)
+	board := generator.generate_board(g.level)
+
+	g.game_timer.start()
 
 	mut grid := [][]Cell{ cap: 9, init: []Cell{ cap: 9 } }
 	for y in 0 .. 9 {
@@ -144,7 +183,7 @@ fn (mut g Game) draw_grid() {
 				cell_user_input_text_cfg
 			}
 
-			if cell.value > 0 {
+			if cell.value > 0 && g.state != .pause {
 				g.gg.draw_text(
 					x * cell_size + cell_size / 2,
 					y * cell_size + cell_size / 2,
@@ -154,6 +193,64 @@ fn (mut g Game) draw_grid() {
 			}
 		}
 	}
+}
+
+fn (mut g Game) draw_time() {
+	current_time := g.game_timer.elapsed()
+	seconds_num := int(current_time.seconds())
+	hours := seconds_num / 3600
+	minutes := (seconds_num - (hours * 3600)) / 60
+	seconds := seconds_num - (hours * 3600) - (minutes * 60)
+
+	hours_str := if hours < 10 { '0' + hours.str() } else { hours.str() }
+	minutes_str := if minutes < 10 { '0' + minutes.str() } else { minutes.str() }
+	seconds_str := if seconds < 10 { '0' + seconds.str() } else { seconds.str() }
+
+	mut current_time_str := ''
+
+	if hours > 0 {
+		current_time_str += hours_str + ':'
+	}
+
+	current_time_str += minutes_str + ':' + seconds_str
+
+	g.gg.draw_text(
+		game_size / 2,
+		game_size + status_size / 2,
+		current_time_str,
+		timer_text_cfg
+	)
+}
+
+fn (mut g Game) draw_level() {
+	difficulty_str := match g.level {
+		.easy { 'Easy' }
+		.medium { 'Medium' }
+		.hard { 'Hard' }
+		.expert { 'Expert' }
+	}
+
+	g.gg.draw_text(
+		game_size - 10,
+		game_size + status_size / 2,
+		difficulty_str,
+		right_align_text_cfg
+	)
+}
+
+fn (mut g Game) draw_state() {
+	status_str := match g.state {
+		.running { 'In progress' }
+		.won { 'You won!' }
+		else { 'Paused' }
+	}
+
+	g.gg.draw_text(
+		10,
+		game_size + status_size / 2,
+		status_str,
+		left_align_text_cfg
+	)
 }
 
 fn (mut g Game) draw_regions() {
@@ -271,10 +368,18 @@ fn (mut g Game) draw_active_cell() {
 }
 
 fn (mut g Game) draw_scene() {
-	g.draw_active_cell()
-	g.draw_grid()
-	g.draw_invalid_cell()
+	if g.state != .pause {
+		g.draw_active_cell()
+		g.draw_grid()
+		g.draw_invalid_cell()
+	} else {
+		g.draw_grid()
+	}
+
 	g.draw_regions()
+	g.draw_time()
+	g.draw_level()
+	g.draw_state()
 }
 
 fn (mut g Game) set_active_cell(col i8, row i8) {
@@ -313,6 +418,16 @@ fn (mut g Game) set_cell_value(cell Location, value i8) {
 
 fn (mut g Game) clear_cell(cell Location) {
 	g.set_cell_value(cell, 0)
+}
+
+fn (mut g Game) toggle_state() {
+	if g.state == .running {
+		g.state = .pause
+		g.game_timer.pause()
+	} else {
+		g.state = .running
+		g.game_timer.start()
+	}
 }
 
 fn (mut g Game) mouse_left_down(x f32, y f32) {
@@ -368,6 +483,9 @@ fn (mut g Game) key_down(key sapp.KeyCode) {
 		}
 		.c {
 			g.clear_cell(g.active_cell)
+		}
+		.p {
+			g.toggle_state()
 		}
 		else {
 		}
@@ -427,7 +545,6 @@ fn (g Game) get_invalids_for_cell(cell Location) []Location {
 			}
 		}
 	}
-
 
 	return invalids
 }
