@@ -156,7 +156,13 @@ fn main() {
 		font_path: font_path
 	})
 
-	game_level := parse_level(os.args[1]) or {
+	raw_level_input := if os.args.len > 1 {
+		os.args[1]
+	} else {
+		'easy'
+	}
+
+	game_level := parse_level(raw_level_input) or {
 		generator.Difficulty.easy
 	}
 
